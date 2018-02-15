@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Digital Clock</title>
+	<script crossorigin src="https://unpkg.com/react@16/umd/react.development.js"></script>
+	<script crossorigin src="https://unpkg.com/react-dom@16/umd/react-dom.development.js"></script>
+    <script crossorigin src="https://unpkg.com/babel-standalone@6.15.0/babel.min.js"></script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="text/babel">
+		
+		// A simple Javascript object containing a logical representation of digital clock numerals from 0 to 9. This could be represented as strings of 1s and 0s if you prefer
+		const numerals = {
+			"1": {
+				top: false, top_left: false, top_right: true, middle: false, bottom_left: false, bottom_right: true, bottom: false
+			},
+			"2": {
+				top: true, top_left: false, top_right: true, middle: true, bottom_left: true, bottom_right: false, bottom: true
+			},
+			"3": {
+				top: true, top_left: false, top_right: true, middle: true, bottom_left: false, bottom_right: true, bottom: true
+			},
+			"4": {
+				top: false, top_left: true, top_right: true, middle: true, bottom_left: false, bottom_right: true, bottom: false
+			},
+			"5": {
+				top: true, top_left: true, top_right: false, middle: true, bottom_left: false, bottom_right: true, bottom: true
+			},
+			"6": {
+				top: true, top_left: true, top_right: false, middle: true, bottom_left: true, bottom_right: true, bottom: true
+			},
+			"7": {
+				top: true, top_left: false, top_right: true, middle: false, bottom_left: false, bottom_right: true, bottom: false
+			},
+			"8": {
+				top: true, top_left: true, top_right: true, middle: true, bottom_left: true, bottom_right: true, bottom: true
+			},
+			"9": {
+				top: true, top_left: true, top_right: true, middle: true, bottom_left: false, bottom_right: true, bottom: true
+			},
+			"0": {
+				top: true, top_left: true, top_right: true, middle: false, bottom_left: true, bottom_right: true, bottom: true
+			}
+		}
+		
+		// represents one half of a numeral in the clock
+		class NumeralSection extends React.Component {
+			render() {
+				// use the data from the numerals object to highlight the edges, by applying a CSS class if truthy
+				let style = "numeral-section";
+				if (this.props.top) {
+					style += " border-top";
+				}
+				if (this.props.bottom) {
+					style += " border-bottom";
+				}
+				if (this.props.left) {
+					style += " border-left"
+				}
+				if (this.props.right) {
+					style += " border-right"
+				}
+				
+				return <div className={style}></div>
+			}
+		}
+		
+		// represents a whole numeral in the clock, for example a 9
+		class Numeral extends React.Component {
+			render() {
+				const value = this.props.value;
+				let content;
+				if (value || value ===0) {
+					// Look up the numeral representation from the numeral object defined earlier (basically representing the lines in a digital format numeral)
+					const numeral = numerals[value.toString()];
+
+					// create two separate components that together form a digital clock-style numeral when certain edges are illuminated
+					content = [
+						<NumeralSection key="top" top={numeral.top} left={numeral.top_left} right={numeral.top_right} bottom={numeral.middle}/>,
+						<NumeralSection key="bottom" top={numeral.middle} left={numeral.bottom_left} right={numeral.bottom_right} bottom={numeral.bottom}/>
+					]
+				}
+				
+				return (
+					<div className="numeral">
+						{content}
+					</div>
+				)
+			}
+
+		}
+		
+		// represents a pair of numerals that tell part of the time, for example 14 seconds
+		class NumeralPair extends React.Component {
+			render() {
+
+				// Need to always ensure there are two numerals, and the date object only provides one if the number < 10, so this adds a 0 to the left hand side if necessary
+				const value = this.props.value;
+				let left, right;
+				if (value <= 9) {
+					left = 0;
+					right = value;
+				}
+				else {
+					left = Math.floor(value / 10);
+					right = value % 10;
+				}
+				return (
+					<div className="numeral-pair">
+						<Numeral value={left}/>
+						<Numeral value={right}/>
+					</div>
+				)
+			}
+		}
+		
+		// A layout component that provides two neon green dividers between each number pair
+		class Spacer extends React.Component {
+			render() {
+				const date = this.props.date;
+				return (
+					<div className="spacer">
+						<div className="spacer-part"></div>
+						<div className="spacer-part formatted"></div>
+						<div className="spacer-part"></div>
+						<div className="spacer-part formatted"></div>
+						<div className="spacer-part"></div>
+					</div>
+				);
+			}
+		}
+		
+		// A container for the text telling the time period in 12 hour clock, e.g. 'AM'
+		class TimePeriod extends React.Component {
+			render() {
+				return (
+					<div className="time-setting-container">
+						<div className="time-period unselectable">
+							{this.props.text}
+						</div>
+					</div>
+				);
+			}
+		}
+		
+		// A container containing a toggle button for switching between a 12 and 24 hour clock
+		class TimeSettingToggler extends React.Component {
+			render() {
+				let text ="";
+				
+				// Depending on whether the time setting is 12 or 24 hour clock, highlight the current setting
+				if (this.props.timeSetting === "12") {
+					text = (<p className="unselectable"><strong>12</strong> / 24</p>);
+				}
+				else if (this.props.timeSetting === "24"){
+					text = (<p className="unselectable">12 / <strong>24</strong></p>);
+				}
+
+				// Return the component with an onClick event handler, which calls the Clock component toggle method
+				return (
+					<div className="time-setting-container">
+							<div className="time-setting-toggler" onClick={this.props.toggle}>
+								{text}
+							</div>
+					</div>
+				);
+			}
+		}
+		
+		// A container on the right hand side of the clock containing the display 
+		class TimeSetting extends React.Component {
+			render() {
+				let text;
+				if (this.props.timeSetting === "12" && this.props.timePeriod==="AM") {
+					text = "AM";
+				}
+				else if (this.props.timeSetting === "12" && this.props.timePeriod==="PM"){
+					text = "PM"; 
+				}
+				return (
+					<div className="time-setting">
+						<TimePeriod text={text}/>
+						<TimeSettingToggler timeSetting={this.props.timeSetting} toggle={this.props.toggle}/>
+					</div>
+				);
+			}
+		}
+		
+		// The top-level react component, which represents the outer 'box' of the clock, and also maintains and updates its internal state
+		class Clock extends React.Component {
+			constructor(props) {
+				super(props);
+
+				// The context 'this' of the component is bound to the methods within the component
+				this.tick = this.tick.bind(this);
+				this.toggleTimeSetting = this.toggleTimeSetting.bind(this)
+
+				// Sets the initial component state, initially to a 24 hour clock, and with a new Javascript date object
+				this.state = {timeSetting: "24", date: new Date()};
+			}
+			
+			// React lifecycle method called when the component is rendered
+			componentDidMount() {
+				this.tick();
+				// Sets a timer to update the clock every 1000 milliseconds (every second)
+				setInterval(this.tick, 1000);
+			}
+			
+			render() {
+				
+				// Gets the current hour of the day from the date object stored in the component state
+				const hours = this.state.date.getHours();
+				
+				// If the time is mid-day or later, set time period as PM, otherwise AM
+				let timePeriod = (hours >= 12) ? timePeriod = "PM" : timePeriod = "AM";
+				
+				// If the 12-hour clock is set, and the time is 13:00 or greater, convert hours to hours mod 12, otherwise, not
+				const convertedHours = (this.state.timeSetting === "12" && hours > 12) ? (hours % 12) : hours;
+
+				// Returns the basic layout of the clock
+				return (
+					<div className="clock">
+						<NumeralPair value={convertedHours}/>
+						<Spacer/>
+						<NumeralPair value={this.state.date.getMinutes()}/>
+						<Spacer/>
+						<NumeralPair value={this.state.date.getSeconds()}/>
+						<TimeSetting timePeriod={timePeriod} timeSetting={this.state.timeSetting} toggle={this.toggleTimeSetting}/>
+					</div>
+				);
+			}
+			
+			// An update method that can be called as a callback passed to a lower level component, which toggles the clock state between a 12 hour and 24 hour clock
+			toggleTimeSetting() {
+				(this.state.timeSetting === "24") ? this.setState({timeSetting: "12"}) : this.setState({timeSetting: "24"});
+			}
+			
+			// Updates the component state with a new date object, i.e. refreshes the time
+			tick() {
+				this.setState({date: new Date()});
+			}
+		}
+		 
+		// Mount the top level component to the document object
+		ReactDOM.render(
+			<Clock/>, document.getElementById('root')
+		);
+		
+
+    </script>
+	
+	<style rel="stylesheet" type="text/css" >
+		body {
+			font-family: sans-serif;
+		}
+		
+		.clock {
+			display: flex;
+			flex-direction: row;
+			height: 100px;;
+			width: 300px;
+			background: black;
+		}
+
+		.unselectable {
+			user-select: none;
+			-moz-user-select: none;
+  			-webkit-user-select: none;
+  			-ms-user-select: none;
+		}
+		
+		.time-setting {
+			flex: 1;
+			display: flex;
+			flex-direction: column;
+		}
+		
+		.time-setting-container {
+			flex: 1;
+			display: flex;
+			justify-content: center;
+			align-items: center
+			margin: 2px;
+		}
+		
+		.time-setting-toggler {
+			color: #39FF14;
+			padding: 2px;
+			display: flex;
+			justify-content: center;
+			align-items: center;
+			
+		}
+		
+		.time-setting-toggler:hover {
+			cursor: pointer;
+		}
+		
+		.time-period {
+			flex: 1;
+			justify-content: center;
+			align-items: center;
+			display: flex;
+			width: 100%;
+			color: #39FF14;
+			user-select: none;
+		}
+		
+		.spacer {
+			max-width: 3px;
+			flex: 1;
+			display: flex;
+			flex-direction: column;
+		}
+		
+		.spacer-part {
+			flex: 1;
+		}
+		
+		.spacer-part.formatted {
+			background: #39FF14;
+		}
+		
+		.numeral-pair {
+			flex: 1;
+			display: flex;
+			flex-direction: row;
+			margin: 2px;
+		}
+		
+		.numeral {
+			flex: 1;
+			display: flex;
+			flex-direction: column;
+			margin: 2px;
+			height: inherit;
+		}
+		
+		.numeral-section {
+			margin-left: 2px;
+			margin-right: 2px;
+			flex: 1;
+			border: 2px solid black;
+		}
+		
+		.border-left {
+			border-left: 2px solid #39FF14
+		}
+		
+		.border-right {
+			border-right: 2px solid #39FF14
+		}
+		
+		.border-top {
+			border-top: 2px solid #39FF14
+		}
+		
+		.border-bottom {
+			border-bottom: 2px solid #39FF14
+		}
+	</style>
+  </body>
+</html> 
